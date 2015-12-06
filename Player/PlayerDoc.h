@@ -6,7 +6,7 @@
 #pragma once
 
 #include <memory>
-
+#include <atomic>
 
 #include "decoderinterface.h"
 
@@ -68,6 +68,16 @@ public:
 	__event void totalTimeUpdated(double secs);
 	__event void currentTimeUpdated(double secs);
 
+    std::string getSubtitle();
+
+private:
+    void OpenSubRipFile(LPCTSTR lpszVideoPathName);
+
 private:
 	std::unique_ptr<IFrameDecoder> m_frameDecoder;
+
+    std::atomic<double> m_currentTime;
+
+    class SubtitlesMap;
+    std::unique_ptr<SubtitlesMap> m_subtitles;
 };

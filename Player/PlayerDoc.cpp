@@ -16,11 +16,18 @@
 #include <propkey.h>
 #include <memory>
 
+#include <boost/icl/interval_map.hpp>
+
+#include <fstream>
+
 #include <VersionHelpers.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+class CPlayerDoc::SubtitlesMap : public boost::icl::interval_map<double, std::string>
+{};
 
 // CPlayerDoc
 
@@ -152,6 +159,7 @@ BOOL CPlayerDoc::OnOpenDocument(LPCTSTR lpszPathName)
 
     if (m_frameDecoder->openFile(lpszPathName))
     {
+        OpenSubRipFile(lpszPathName);
         m_frameDecoder->play();
     }
 
@@ -161,6 +169,7 @@ BOOL CPlayerDoc::OnOpenDocument(LPCTSTR lpszPathName)
 void CPlayerDoc::OnCloseDocument()
 {
 	m_frameDecoder->close();
+    m_subtitles.reset();
 	CDocument::OnCloseDocument();
 }
 
@@ -168,8 +177,10 @@ void CPlayerDoc::OnCloseDocument()
 void CPlayerDoc::changedFramePosition(long long frame, long long total)
 {
 	__raise framePositionChanged(frame, total);
+    const double currentTime = m_frameDecoder->getDurationSecs(frame);
+    m_currentTime = currentTime;
 	__raise totalTimeUpdated(m_frameDecoder->getDurationSecs(total));
-	__raise currentTimeUpdated(m_frameDecoder->getDurationSecs(frame));
+    __raise currentTimeUpdated(currentTime);
 }
 
 bool CPlayerDoc::pauseResume()
@@ -200,4 +211,76 @@ bool CPlayerDoc::isPaused() const
 double CPlayerDoc::soundVolume() const
 {
 	return m_frameDecoder->volume();
+}
+
+void CPlayerDoc::OpenSubRipFile(LPCTSTR lpszVideoPathName)
+{
+    m_subtitles.reset();
+
+    CString subRipPathName(lpszVideoPathName);
+    PathRemoveExtension(subRipPathName.GetBuffer());
+    subRipPathName.ReleaseBuffer();
+    subRipPathName += _T(".srt");
+
+    std::ifstream s(subRipPathName);
+    if (!s)
+        return;
+
+    auto map(std::make_unique<SubtitlesMap>());
+
+    std::string buffer;
+    for (;;)
+    {
+        if (!std::getline(s, buffer))
+            break;
+        if (!std::getline(s, buffer))
+            break;
+
+        int startHr, startMin, startSec, startMsec;
+        int endHr, endMin, endSec, endMsec;
+
+        if (sscanf(
+            buffer.c_str(),
+            "%d:%d:%d,%d --> %d:%d:%d,%d",
+            &startHr, &startMin, &startSec, &startMsec,
+            &endHr, &endMin, &endSec, &endMsec) != 8)
+        {
+            break;
+        }
+
+        const double start = startHr * 3600 + startMin * 60 + startSec + startMsec / 1000.;
+        const double end = endHr * 3600 + endMin * 60 + endSec + endMsec / 1000.;
+
+        std::string subtitle;
+        while (std::getline(s, buffer) && !buffer.empty())
+        {
+            if (!subtitle.empty())
+                subtitle += '\n';
+            subtitle += buffer;
+        }
+
+        if (!subtitle.empty())
+        {
+            map->add(std::make_pair(boost::icl::interval<double>::closed(start, end), subtitle));
+        }
+    }
+
+    if (!map->empty())
+    {
+        m_subtitles = std::move(map);
+    }
+}
+
+std::string CPlayerDoc::getSubtitle()
+{
+    std::string result;
+    if (m_subtitles)
+    {
+        auto it = m_subtitles->find(m_currentTime); 
+        if (it != m_subtitles->end())
+        {
+            result = it->second;
+        }
+    }
+    return result;
 }

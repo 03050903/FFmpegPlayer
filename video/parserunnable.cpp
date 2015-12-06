@@ -116,6 +116,18 @@ void ParseRunnable::dispatchPacket(AVPacket& packet)
     }
     else
     {
+        //auto codec = m_ffmpeg->m_formatContext->streams[packet.stream_index]->codec;
+        //if (codec->codec_type == AVMEDIA_TYPE_SUBTITLE)
+        //{
+        //    AVSubtitle subtitle {};
+        //    int has_subtitle = 0;
+        //    avcodec_decode_subtitle2(codec, &subtitle, &has_subtitle, &packet);
+        //    if (has_subtitle)
+        //    {
+        //        auto format = subtitle.format;
+        //    }
+        //}
+
         return; // guard frees packet
     }
 

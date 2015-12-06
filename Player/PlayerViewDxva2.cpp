@@ -12,6 +12,8 @@
 #include <d3d9.h>
 #include <dxva2api.h>
 
+#include <Gdiplus.h>
+
 #include <vector>
 
 
@@ -215,6 +217,35 @@ DXVA2_AYUVSample16 GetBackgroundColor()
 	color.Alpha = 0xFFFF;
 
 	return color;
+}
+
+
+void DrawText(BYTE* buffer, int width, int height, const WCHAR* text)
+{
+    using namespace Gdiplus;
+
+    Bitmap bitmap(width, height, width * 2, PixelFormat16bppRGB565, buffer);
+
+    Graphics graphics(&bitmap);
+
+    graphics.SetTextRenderingHint(TextRenderingHintSingleBitPerPixel);
+
+    const int fontSize = max(width / 50, 9);
+    Gdiplus::Font font(L"MS Sans Serif", (REAL) fontSize);
+
+    const auto length = wcslen(text);
+    RectF boundingBox;
+
+    graphics.MeasureString(text, length, &font, PointF(0, 0), &boundingBox);
+
+    const auto left = (width - boundingBox.Width) / 2;
+    const auto top = height - boundingBox.Height - fontSize / 2;
+
+    SolidBrush blackBrush(Color(0x7F, 0xE0, 0));
+    SolidBrush whiteBrush(Color(0x7F, 0xFF, 0xFF));
+
+    graphics.DrawString(text, length, &font, PointF(left + 1, top + 1), &blackBrush);
+    graphics.DrawString(text, length, &font, PointF(left, top), &whiteBrush);
 }
 
 } // namespace
@@ -1059,6 +1090,12 @@ void CPlayerViewDxva2::updateFrame()
 	{
 		return;
 	}
+
+    auto subtitle = GetDocument()->getSubtitle();
+    if (!subtitle.empty())
+    {
+        DrawText(data.image[0], data.width, data.height, CA2W(subtitle.c_str(), CP_UTF8));
+    }
 
 	CSingleLock lock(&m_csSurface, TRUE);
 
