@@ -16,6 +16,9 @@
 
 #include <vector>
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
 
 namespace {
 
@@ -228,7 +231,7 @@ void DrawText(BYTE* buffer, int width, int height, const WCHAR* text)
 
     Graphics graphics(&bitmap);
 
-    graphics.SetTextRenderingHint(TextRenderingHintSingleBitPerPixel);
+    graphics.SetTextRenderingHint(TextRenderingHintSingleBitPerPixelGridFit);
 
     const int fontSize = max(width / 50, 9);
     Gdiplus::Font font(L"MS Sans Serif", (REAL) fontSize);
